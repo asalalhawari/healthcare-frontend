@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1",
+    "username": "patient1",
+    "password": "$2a$12$g7IOgRPwPtpHN8qF0bO1A.F1zr0PCGt1xDlCgy7RpW6n3LXmQt9.C",
+    "role": "patient",
+    "name": "أحمد محمد",
+    "email": "patient1@example.com",
+    "phone": "123-456-7890"
+  },
+  {
+    "id": "2",
+    "username": "doctor1",
+    "password": "$2a$12$g7IOgRPwPtpHN8qF0bO1A.F1zr0PCGt1xDlCgy7RpW6n3LXmQt9.C",
+    "role": "doctor",
+    "name": "د. سارة أحمد",
+    "email": "doctor1@example.com",
+    "specialty": "القلب",
+    "phone": "123-456-7891"
+  },
+  {
+    "id": "3",
+    "username": "finance1",
+    "password": "$2a$12$g7IOgRPwPtpHN8qF0bO1A.F1zr0PCGt1xDlCgy7RpW6n3LXmQt9.C",
+    "role": "finance",
+    "name": "محمد علي",
+    "email": "finance1@example.com",
+    "phone": "123-456-7892"
+  },
+  {
+    "username": "asal",
+    "password": "$2a$12$a4DzFHng9RnglFXyrRGTuuyBb94f4AfO8qaCdVIMEwZtl8ehBK/ai",
+    "email": "test@twst.com",
+    "name": "Asal",
+    "role": "patient",
+    "id": "1755286264618"
+  }
+]

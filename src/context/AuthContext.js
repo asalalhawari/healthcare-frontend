@@ -1,50 +1,74 @@
-"use client"
+"use client";
 
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect } from "react";
 
-const AuthContext = createContext(undefined)
+const AuthContext = createContext(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context
-}
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true); // New loading state
 
-  // Mock users for demo
-  const mockUsers = [
-    { id: "1", name: "John Patient", email: "patient@demo.com", password: "patient123", type: "patient" },
-    { id: "2", name: "Dr. Smith", email: "doctor@demo.com", password: "doctor123", type: "doctor" },
-    { id: "3", name: "Finance Manager", email: "finance@demo.com", password: "finance123", type: "finance" },
-    { id: "4", name: "Dr. Johnson", email: "doctor2@demo.com", password: "doctor123", type: "doctor" },
-  ]
-
+  // Load user from localStorage on mount
   useEffect(() => {
-    const savedUser = localStorage.getItem("currentUser")
+    const savedUser = localStorage.getItem("currentUser");
     if (savedUser) {
-      setUser(JSON.parse(savedUser))
+      setUser(JSON.parse(savedUser));
     }
-  }, [])
+    setLoading(false); // done loading
+  }, []);
 
-  const login = async (email, password) => {
-    const foundUser = mockUsers.find((u) => u.email === email && u.password === password)
-    if (foundUser) {
-      const { password: _, ...userWithoutPassword } = foundUser
-      setUser(userWithoutPassword)
-      localStorage.setItem("currentUser", JSON.stringify(userWithoutPassword))
-      return true
+  const login = async (username, password) => {
+    try {
+      console.log("[v0] AuthContext: Attempting login with username:", username);
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL || "http://localhost:3002/api"}/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        }
+      );
+
+      console.log("[v0] AuthContext: Login response status:", response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("[v0] AuthContext: Login successful, user data:", data.user);
+
+        setUser(data.user);
+        localStorage.setItem("currentUser", JSON.stringify(data.user));
+        localStorage.setItem("token", data.token);
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.log("[v0] AuthContext: Login failed:", errorData.message);
+        return false;
+      }
+    } catch (error) {
+      console.error("[v0] AuthContext: Login error:", error);
+      return false;
     }
-    return false
-  }
+  };
 
   const logout = () => {
-    setUser(null)
-    localStorage.removeItem("currentUser")
-  }
+    setUser(null);
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("token");
+    
+  };
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>
-}
+  return (
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};

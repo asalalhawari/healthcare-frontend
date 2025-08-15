@@ -1,54 +1,109 @@
-"use client"
+"use client";
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
-import Login from "./components/Login"
-import PatientDashboard from "./components/PatientDashboard"
-import DoctorDashboard from "./components/DoctorDashboard"
-import FinanceDashboard from "./components/FinanceDashboard"
-import { AuthProvider, useAuth } from "./context/AuthContext"
-import { DatabaseProvider } from "./context/DatabaseContext"
-import "./App.css"
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import Login from "./components/Login";
+import PatientDashboard from "./components/PatientDashboard";
+import DoctorDashboard from "./components/DoctorDashboard";
+import FinanceDashboard from "./components/FinanceDashboard";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { DatabaseProvider } from "./context/DatabaseContext";
+import "./App.css";
+
+// PrivateRoute wrapper
+function PrivateRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+
+  return children;
+}
 
 function AppRoutes() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth();
 
-  if (!user) {
-    return <Login />
-  }
+  if (loading) return <div>Loading...</div>; // wait until user is loaded
+
+
+  
+  
 
   return (
     <Routes>
+      {/* Public login route */}
       <Route
-        path="/"
-        element={
-          user.type === "patient" ? (
-            <PatientDashboard />
-          ) : user.type === "doctor" ? (
-            <DoctorDashboard />
-          ) : user.type === "finance" ? (
-            <FinanceDashboard />
-          ) : (
-            <Navigate to="/login" />
-          )
-        }
+        path="/login"
+        element={user ? <Navigate to="/" replace /> : <Login />}
       />
-      <Route path="*" element={<Navigate to="/" />} />
+
+
+      
+
+
+      {/* Protected routes */}
+      {user?.role == null && (
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              {/* <PatientDashboard /> */}
+            </PrivateRoute>
+          }
+        />
+      )}
+      {user?.role === "patient" && (
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <PatientDashboard />
+            </PrivateRoute>
+          }
+        />
+      )}
+
+      {user?.role === "doctor" && (
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <DoctorDashboard />
+            </PrivateRoute>
+          }
+        />
+      )}
+
+      {user?.role === "finance" && (
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <FinanceDashboard />
+            </PrivateRoute>
+          }
+        />
+      )}
+
+      
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  )
+  );
 }
 
 function App() {
   return (
-    <DatabaseProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <DatabaseProvider>
         <Router>
           <div className="App">
             <AppRoutes />
           </div>
         </Router>
-      </AuthProvider>
-    </DatabaseProvider>
-  )
+      </DatabaseProvider>
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;

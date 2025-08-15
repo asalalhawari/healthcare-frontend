@@ -13,6 +13,7 @@ const PatientDashboard = () => {
 
   const patientVisits = visits.filter((visit) => visit.patientId === user?.id)
   const availableDoctors = doctors.filter((doctor) => doctor.isAvailable)
+  
 
   const handleBookVisit = (e) => {
     e.preventDefault()

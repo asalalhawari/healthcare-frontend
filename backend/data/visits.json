@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1",
+    "patientId": "1",
+    "doctorId": "2",
+    "patientName": "أحمد محمد",
+    "doctorName": "د. سارة أحمد",
+    "date": "2024-01-15",
+    "time": "10:00",
+    "status": "completed",
+    "treatments": [
+      {
+        "name": "فحص عام",
+        "cost": 100
+      },
+      {
+        "name": "تحليل دم",
+        "cost": 50
+      }
+    ],
+    "totalAmount": 150,
+    "paymentStatus": "paid",
+    "notes": "فحص دوري، النتائج طبيعية",
+    "createdAt": "2024-01-15T10:00:00.000Z"
+  }
+]
