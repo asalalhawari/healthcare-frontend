@@ -13,11 +13,10 @@ const generateVisitId = () => {
 router.post(
   "/",
   auth,
-  authorize("patient"),
   [
     body("doctorId").notEmpty().withMessage("Doctor ID is required"),
-    body("appointmentDate").isISO8601().withMessage("Valid appointment date is required"),
-    body("symptoms").trim().isLength({ min: 10 }).withMessage("Symptoms description must be at least 10 characters"),
+    body("date").isISO8601().withMessage("Valid appointment date is required"),
+    // body("symptoms").trim().isLength({ min: 10 }).withMessage("Symptoms description must be at least 10 characters"),
   ],
   async (req, res) => {
     try {
@@ -26,16 +25,16 @@ router.post(
         return res.status(400).json({ errors: errors.array() })
       }
 
-      const { doctorId, appointmentDate, symptoms } = req.body
+      const { doctorId, date, symptoms } = req.body
 
       const doctor = Database.findUserById(doctorId)
-      if (!doctor || doctor.userType !== "doctor") {
+      if (!doctor || doctor.role !== "doctor") {
         return res.status(404).json({ message: "Doctor not found" })
       }
 
-      if (!doctor.isAvailable) {
-        return res.status(400).json({ message: "Doctor is not available" })
-      }
+      // if (!doctor.isAvailable) {
+      //   return res.status(400).json({ message: "Doctor is not available" })
+      // }
 
       const visits = Database.getVisits()
       const existingVisit = visits.find(
@@ -56,7 +55,7 @@ router.post(
         visitId: generateVisitId(),
         patient: req.user.id,
         doctor: doctorId,
-        appointmentDate: new Date(appointmentDate).toISOString(),
+        appointmentDate: new Date(date).toISOString(),
         symptoms,
         status: "scheduled",
         treatments: [],
@@ -79,7 +78,7 @@ router.post(
       res.status(201).json(populatedVisit)
     } catch (error) {
       console.error("Error creating visit:", error)
-      res.status(500).json({ message: "Server error" })
+      res.status(500).json({ message: "Server error " + error.message })
     }
   },
 )

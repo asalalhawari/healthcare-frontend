@@ -34,5 +34,34 @@
     "name": "Asal",
     "role": "patient",
     "id": "1755286264618"
+  },
+  {
+    "username": "safaa",
+    "password": "$2a$12$PA/KKrw6kaCKBDBGfIPKXetO3/rX/e4bZ5HPQzvdKm14MtabEL0Pa",
+    "email": "doctor2@example.com",
+    "name": "صفاء احمد",
+    "role": "doctor",
+    "phone": "123-456-7891",
+    "id": "1755288264718"
+  },
+  {
+    "username": "safaa2",
+    "password": "$2a$12$mHuxlhlIV75JfL4Bgi6BAOxPUalyqLGeTzhJluQnSv2F7ZyzdiiuG",
+    "email": "doctor2@example.com",
+    "name": "صفاء 2",
+    "role": "doctor",
+    "phone": "123-456-7891",
+    "specialty": "الباطنيه",
+    "id": "1755290436472"
+  },
+  {
+    "username": "safaa23",
+    "password": "$2a$12$Hzzi8IIFjgagsffYbhS5Q.AiEi0ut8nMEAA31bXbyXLu8UEXLP5LO",
+    "email": "doctor2@example.com",
+    "name": "صفاء 2",
+    "role": "doctor",
+    "phone": "123-456-7891",
+    "specialty": "الباطنيه",
+    "id": "1755290633378"
   }
 ]

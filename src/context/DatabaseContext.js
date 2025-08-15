@@ -25,7 +25,7 @@ export const DatabaseProvider = ({ children }) => {
 
     try {
       setLoading(true)
-      const response = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:3002/api"}/visits`, {
+      const response = await fetch("http://localhost:3002/api/visits", {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
@@ -47,9 +47,10 @@ export const DatabaseProvider = ({ children }) => {
     if (!user) return
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:3002/api"}/users`, {
+      const response = await fetch("http://localhost:3002/api/users/doctors", {
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
         },
       })
 

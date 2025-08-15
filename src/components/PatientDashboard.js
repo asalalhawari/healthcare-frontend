@@ -12,7 +12,7 @@ const PatientDashboard = () => {
   const [showBooking, setShowBooking] = useState(false)
 
   const patientVisits = visits.filter((visit) => visit.patientId === user?.id)
-  const availableDoctors = doctors.filter((doctor) => doctor.isAvailable)
+  const availableDoctors = doctors;
   
 
   const handleBookVisit = (e) => {

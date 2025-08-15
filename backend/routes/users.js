@@ -20,14 +20,12 @@ router.get("/doctors", auth, async (req, res) => {
   try {
     const users = Database.getUsers();
     const doctors = users
-      .filter((user) => user.role === "doctor") // Filter only doctors
-      .map(({ password, ...user }) => user) // Remove password
-      .sort((a, b) => a.fullName.localeCompare(b.fullName)); // Sort by full name
+      .filter((user) => user.role === "doctor") ;
 
     res.json(doctors);
   } catch (error) {
     console.error("Error fetching doctors:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: error });
   }
 });
 
