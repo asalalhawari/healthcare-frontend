@@ -1,24 +1,26 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 const { body, validationResult } = require("express-validator");
-const db = require("../data/database");
+const bcrypt = require("bcryptjs");
+const pool = require("../data/db.js"); // PostgreSQL connection
 const router = express.Router();
 
 // Generate JWT token
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || "your-secret-key", { expiresIn: "24h" });
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET || "your-secret-key",
+    { expiresIn: "24h" }
+  );
 };
-
-// Register user
 router.post(
   "/register",
   [
-    body("username").trim().isLength({ min: 3 }).withMessage("Username must be at least 3 characters"),
-    body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
-    body("email").isEmail().withMessage("Please provide a valid email"),
-    body("fullName").trim().isLength({ min: 2 }).withMessage("Full name is required"),
-    body("userType").isIn(["patient", "doctor", "finance"]).withMessage("Invalid user type"),
+    body("username").trim().isLength({ min: 3 }),
+    body("password").isLength({ min: 6 }),
+    body("email").isEmail(),
+    body("name").trim().isLength({ min: 2 }),
+    body("role").isIn(["patient", "doctor", "finance"]),
   ],
   async (req, res) => {
     try {
@@ -27,88 +29,93 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { username, password, email, fullName, userType, specialization, dateOfBirth, phone } = req.body;
-
-      const existingUser = db.findUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({
-          message: "User with this username already exists",
-        });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 12);
-      const userData = {
+      const {
         username,
-        password: hashedPassword,
+        password,
         email,
-        name: fullName,
-        role: userType,
+        name,
+        role,
+        specialty,
+        date_of_birth,
         phone,
-      };
+      } = req.body;
 
-      if (userType === "doctor") {
-        userData.specialty = specialization;
-      } else if (userType === "patient") {
-        userData.dateOfBirth = dateOfBirth;
+      // Check if username or email already exists
+      const existingUserResult = await pool.query(
+        "SELECT * FROM users WHERE username = $1 OR email = $2",
+        [username, email]
+      );
+
+      if (existingUserResult.rows.length > 0) {
+        return res
+          .status(400)
+          .json({ message: "User with this username or email already exists" });
       }
 
-      const user = db.addUser(userData);
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      // Insert new user
+      const insertQuery = `
+        INSERT INTO users (username, password, role, name, email, phone, specialty, date_of_birth)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING *
+      `;
+      const values = [
+        username,
+        hashedPassword,
+        role,
+        name,
+        email,
+        phone || null,
+        specialty || null,
+        date_of_birth || null,
+      ];
+
+      const result = await pool.query(insertQuery, values);
+      const user = result.rows[0];
+
+      // Generate token
       const token = generateToken(user.id);
 
       res.status(201).json({
         message: "User registered successfully",
         token,
-        user: user,
+        user,
       });
     } catch (error) {
       console.error("Registration error:", error);
-      res.status(500).json({ message: "Server error during registration" });
+      res.status(500).json({ message: "Server error during registration" + error  });
     }
   }
 );
-
 // Login user
 router.post(
   "/login",
   [
-    body("username").trim().notEmpty().withMessage("Username is required"),
-    body("password").notEmpty().withMessage("Password is required"),
+    body("username").trim().notEmpty(),
+    body("password").notEmpty(),
   ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const { username, password } = req.body;
 
-      const user = db.findUserByUsername(username);
-      if (!user) {
-        return res.status(400).json({ message: "user not found" });
-      }
+      const userResult = await pool.query("SELECT * FROM users WHERE username = $1", [username]);
+      const user = userResult.rows[0];
 
+      if (!user) return res.status(400).json({ message: "User not found" });
+
+      // Compare hashed password
       const isMatch = await bcrypt.compare(password, user.password);
-        
-
-      if (!isMatch) {
+      if (!isMatch)
         return res.status(400).json({ message: "Invalid credentials" });
-      }
 
       const token = generateToken(user.id);
 
-      res.json({
-        message: "Login successful",
-        token,
-        user: {
-          id: user.id,
-          username: user.username,
-          name: user.name,
-          role: user.role,
-          email: user.email,
-          specialty: user.specialty,
-        },
-      });
+      res.json({ message: "Login successful", token, user });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Server error during login" });

@@ -11,7 +11,7 @@ const DoctorDashboard = () => {
   const [newTreatment, setNewTreatment] = useState({ name: "", cost: 0 })
   const [visitNotes, setVisitNotes] = useState("")
 
-  const doctorVisits = visits.filter((visit) => visit.doctorId === user?.id)
+  const doctorVisits = visits
   const currentDoctor = doctors.find((d) => d.id === user?.id)
   const activeVisit = doctorVisits.find((visit) => visit.status === "in-progress")
   const scheduledVisits = doctorVisits.filter((visit) => visit.status === "scheduled")
@@ -26,6 +26,12 @@ const DoctorDashboard = () => {
     updateVisit(visitId, { status: "in-progress" })
     setSelectedVisit(visitId)
     setDoctorAvailability(user.id, false)
+  }
+
+  const selectVisit = (visitId) => {
+
+    setSelectedVisit(visitId)
+
   }
 
   const completeVisit = (visitId) => {
@@ -47,16 +53,37 @@ const DoctorDashboard = () => {
     alert("✅ Visit completed successfully!")
   }
 
+
+
+  const currentVisit = selectedVisit ? visits.find((v) => v.id === selectedVisit) : activeVisit
+  const totalRevenue = completedVisits.reduce((sum, visit) => {
+  const treatmentTotal = visit.treatments
+    ? visit.treatments.reduce((tSum, t) => Math.floor(tSum) + Math.floor(t.cost), 0)
+    : 0;
+
+  return sum + Math.floor(visit.total_amount || 0) + Math.floor(treatmentTotal);
+}, 0);
+
   const handleAddTreatment = (e) => {
-    e.preventDefault()
-    if (!selectedVisit || !newTreatment.name || newTreatment.cost <= 0) return
+  e.preventDefault();
 
-    addTreatment(selectedVisit, newTreatment)
-    setNewTreatment({ name: "", cost: 0 })
-  }
+  if (!currentVisit || !newTreatment.name || newTreatment.cost <= 0) return;
 
-  const currentVisit = selectedVisit ? visits.find((v) => v.id === selectedVisit) : null
-  const totalRevenue = completedVisits.reduce((sum, visit) => sum + visit.totalAmount, 0)
+  // Create treatment with unique ID
+  const treatmentToAdd = {
+    id: Date.now(), // simple unique id
+    name: newTreatment.name,
+    cost: newTreatment.cost,
+  };
+
+  // Update the visit locally
+  updateVisit(currentVisit.id, {
+    treatments: [...currentVisit.treatments, treatmentToAdd],
+  });
+
+  // Clear the form
+  setNewTreatment({ name: "", cost: 0 });
+};
 
   return (
     <div className="dashboard">
@@ -89,7 +116,7 @@ const DoctorDashboard = () => {
           </div>
           <div className="stat-card">
             <h3>Total Revenue</h3>
-            <p className="stat-number">${totalRevenue.toFixed(2)}</p>
+            <p className="stat-number">${totalRevenue}</p>
           </div>
         </div>
 
@@ -98,16 +125,23 @@ const DoctorDashboard = () => {
             <h3>🔴 Current Active Visit</h3>
             <div className="visit-details">
               <p>
-                <strong>👤 Patient:</strong> {activeVisit.patientName}
+                <strong>👤 Patient:</strong> {activeVisit.patient_name}
               </p>
               <p>
-                <strong>📅 Date:</strong> {new Date(activeVisit.date).toLocaleString()}
+                <strong>📅 Date:</strong> {new Date(activeVisit.appointment_date).toLocaleString()}
               </p>
               <p>
-                <strong>💰 Current Total:</strong> ${activeVisit.totalAmount.toFixed(2)}
+                <strong>💰 Current Total:</strong> ${activeVisit.total_amount}
               </p>
               <p>
-                <strong>💊 Treatments Added:</strong> {activeVisit.treatments.length}
+                <strong>💊 Treatments Added:</strong> 
+                <ul>
+  {currentVisit.treatments.map((treatment) => (
+    <li key={treatment.id}>
+      {treatment.name} - ${treatment.cost}
+    </li>
+  ))}
+</ul>
               </p>
             </div>
           </div>
@@ -122,11 +156,11 @@ const DoctorDashboard = () => {
           ) : (
             <div className="visits-list">
               {scheduledVisits
-                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .sort((a, b) => new Date(a.appointment_date) - new Date(b.appointment_date))
                 .map((visit) => (
                 <div key={visit.id} className="visit-card">
                   <div className="visit-header">
-                    <h4>👤 {visit.patientName}</h4>
+                    <h4>👤 {visit.patient_name}</h4>
                     <button 
                       onClick={() => startVisit(visit.id)} 
                       className="primary-btn" 
@@ -136,10 +170,10 @@ const DoctorDashboard = () => {
                     </button>
                   </div>
                   <p>
-                    <strong>📅 Scheduled:</strong> {new Date(visit.date).toLocaleString()}
+                    <strong>📅 Scheduled:</strong> {new Date(visit.appointment_date).toLocaleString()}
                   </p>
                   <p>
-                    <strong>⏰ Status:</strong> <span className="status scheduled">Waiting</span>
+                    <strong>⏰ Status:</strong> <span className="status ">{visit.status}</span>
                   </p>
                 </div>
               ))}
@@ -149,7 +183,7 @@ const DoctorDashboard = () => {
 
         {currentVisit && currentVisit.status === "in-progress" && (
           <div className="visit-management">
-            <h3>👨‍⚕️ Managing Visit - {currentVisit.patientName}</h3>
+            <h3>👨‍⚕️ Managing Visit - {currentVisit.patient_name}</h3>
 
             <div className="treatments-section">
               <h4>💊 Add Treatment</h4>
@@ -194,7 +228,7 @@ const DoctorDashboard = () => {
                     {currentVisit.treatments.map((treatment) => (
                       <li key={treatment.id} className="treatment-item">
                         <span>
-                          💊 {treatment.name} - <strong>${treatment.cost.toFixed(2)}</strong>
+                          💊 {treatment.name} - <strong>${treatment.cost}</strong>
                         </span>
                         <button 
                           onClick={() => removeTreatment(currentVisit.id, treatment.id)} 
@@ -214,7 +248,7 @@ const DoctorDashboard = () => {
                   border: '2px solid var(--secondary-green)'
                 }}>
                   <strong style={{ fontSize: '1.125rem' }}>
-                    💰 Total Amount: ${currentVisit.totalAmount.toFixed(2)}
+                    💰 Total Amount: ${currentVisit.total_amount}
                   </strong>
                 </div>
               </div>
@@ -242,42 +276,65 @@ const DoctorDashboard = () => {
         )}
 
         <div className="completed-visits">
-          <h3>✅ Recent Completed Visits</h3>
-          {completedVisits.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
-              <p>📋 No completed visits yet.</p>
+  <h3>✅ Recent Completed Visits</h3>
+  {completedVisits.length === 0 ? (
+    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--gray-500)' }}>
+      <p>📋 No completed visits yet.</p>
+    </div>
+  ) : (
+    <div className="visits-list">
+      {completedVisits
+        .sort((a, b) => new Date(b.appointment_date) - new Date(a.appointment_date))
+        .slice(0, 5)
+        .map((visit) => {
+          // ✅ Calculate total treatment cost
+          const totalTreatmentCost = visit.treatments.reduce(
+            (sum, treatment) => Math.floor(sum) + Math.floor(treatment.cost || 0),
+            0
+          );
+
+          return (
+            <div key={visit.id} className="visit-card completed">
+              <div className="visit-header">
+                <h4>👤 {visit.patient_name}</h4>
+                <span className="status completed">✅ Completed</span>
+              </div>
+              <p>
+                <strong>📅 Date:</strong>{" "}
+                {new Date(visit.appointment_date).toLocaleString()}
+              </p>
+
+              {/* Show total cost from visit.total_amount + treatment costs */}
+              <p>
+                <strong>💰 Total Amount:</strong> $
+                {Math.floor(visit.total_amount || 0) + Math.floor(totalTreatmentCost)}
+              </p>
+
+              {/* Show treatment details */}
+              <p>
+                <strong>💊 Treatments:</strong>
+              </p>
+              <ul>
+                {visit.treatments.map((treatment, index) => (
+                  <li key={index}>
+                    {treatment.name} - ${treatment.cost}
+                  </li>
+                ))}
+              </ul>
+
+              {visit.notes && (
+                <p>
+                  <strong>📝 Notes:</strong> {visit.notes.substring(0, 100)}
+                  {visit.notes.length > 100 && "..."}
+                </p>
+              )}
             </div>
-          ) : (
-            <div className="visits-list">
-              {completedVisits
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 5)
-                .map((visit) => (
-                <div key={visit.id} className="visit-card completed">
-                  <div className="visit-header">
-                    <h4>👤 {visit.patientName}</h4>
-                    <span className="status completed">✅ Completed</span>
-                  </div>
-                  <p>
-                    <strong>📅 Date:</strong> {new Date(visit.date).toLocaleString()}
-                  </p>
-                  <p>
-                    <strong>💰 Total Amount:</strong> ${visit.totalAmount.toFixed(2)}
-                  </p>
-                  <p>
-                    <strong>💊 Treatments:</strong> {visit.treatments.length} items
-                  </p>
-                  {visit.notes && (
-                    <p>
-                      <strong>📝 Notes:</strong> {visit.notes.substring(0, 100)}
-                      {visit.notes.length > 100 && '...'}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          );
+        })}
+    </div>
+  )}
+</div>
+
       </div>
     </div>
   )

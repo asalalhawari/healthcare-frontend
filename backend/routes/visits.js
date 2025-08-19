@@ -1,294 +1,270 @@
-const express = require("express")
-const { auth, authorize } = require("../middleware/auth")
-const { body, validationResult } = require("express-validator")
-const Database = require("../data/database")
-const router = express.Router()
+const express = require("express");
+const { auth, authorize } = require("../middleware/auth");
+const { body, validationResult } = require("express-validator");
+const pool = require("../data/db.js");
+const router = express.Router();
 
 // Generate unique visit ID
-const generateVisitId = () => {
-  return "V" + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase()
-}
+const generateVisitId = () =>
+  "V" + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
 
-// Create new visit (Patient books appointment)
+// Create new visit (only patients can create)
 router.post(
   "/",
   auth,
+  authorize("patient"),
   [
     body("doctorId").notEmpty().withMessage("Doctor ID is required"),
     body("date").isISO8601().withMessage("Valid appointment date is required"),
-    // body("symptoms").trim().isLength({ min: 10 }).withMessage("Symptoms description must be at least 10 characters"),
+    body("symptoms").optional().isLength({ min: 3 }).withMessage("Symptoms too short"),
   ],
   async (req, res) => {
     try {
-      const errors = validationResult(req)
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() })
-      }
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-      const { doctorId, date, symptoms } = req.body
+      const { doctorId, date, symptoms } = req.body;
 
-      const doctor = Database.findUserById(doctorId)
-      if (!doctor || doctor.role !== "doctor") {
-        return res.status(404).json({ message: "Doctor not found" })
-      }
+      // ✅ Check doctor exists
+      const doctorResult = await pool.query(
+        "SELECT * FROM users WHERE id = $1 AND role = 'doctor'",
+        [doctorId]
+      );
+      if (doctorResult.rows.length === 0)
+        return res.status(404).json({ message: "Doctor not found" });
 
-      // if (!doctor.isAvailable) {
-      //   return res.status(400).json({ message: "Doctor is not available" })
-      // }
+      // ✅ Check for existing visit at same time
+      const existingVisitResult = await pool.query(
+        "SELECT * FROM visits WHERE doctor_id = $1 AND appointment_date = $2 AND status IN ('scheduled','in-progress')",
+        [doctorId, date]
+      );
+      if (existingVisitResult.rows.length > 0)
+        return res.status(400).json({ message: "Doctor already has a visit scheduled at this time" });
 
-      const visits = Database.getVisits()
-      const existingVisit = visits.find(
-        (visit) =>
-          visit.doctor === doctorId &&
-          new Date(visit.appointmentDate).getTime() === new Date(appointmentDate).getTime() &&
-          (visit.status === "scheduled" || visit.status === "in-progress"),
-      )
+      // ✅ Insert visit (no need for id, SERIAL will handle it)
+      const insertResult = await pool.query(
+        `INSERT INTO visits (patient_id, doctor_id, appointment_date, symptoms, status)
+         VALUES ($1, $2, $3, $4, 'scheduled') RETURNING *`,
+        [req.user.id, doctorId, date, symptoms || null]
+      );
 
-      if (existingVisit) {
-        return res.status(400).json({
-          message: "Doctor already has a visit scheduled at this time",
-        })
-      }
+      const visit = insertResult.rows[0];
+      res.status(201).json(visit);
 
-      const visit = {
-        id: generateVisitId(),
-        visitId: generateVisitId(),
-        patient: req.user.id,
-        doctor: doctorId,
-        appointmentDate: new Date(date).toISOString(),
-        symptoms,
-        status: "scheduled",
-        treatments: [],
-        totalAmount: 0,
-        isPaid: false,
-        createdAt: new Date().toISOString(),
-      }
-
-      Database.addVisit(visit)
-
-      const patient = Database.findUserById(visit.patient)
-      const doctorInfo = Database.findUserById(visit.doctor)
-
-      const populatedVisit = {
-        ...visit,
-        patient: { fullName: patient.fullName, email: patient.email, phone: patient.phone },
-        doctor: { fullName: doctorInfo.fullName, specialization: doctorInfo.specialization },
-      }
-
-      res.status(201).json(populatedVisit)
     } catch (error) {
-      console.error("Error creating visit:", error)
-      res.status(500).json({ message: "Server error " + error.message })
+      console.error("Error creating visit:", error);
+      res.status(500).json({ message: "Server error" });
     }
-  },
-)
+  }
+);
 
-// Get visits based on user type
+
+// Get visits for current user with patient & doctor info
 router.get("/", auth, async (req, res) => {
   try {
-    const { search, status, startDate, endDate } = req.query
+    let query = `
+      SELECT v.*, 
+             p.name AS patient_name, p.email AS patient_email,
+             d.name AS doctor_name, d.specialty AS doctor_specialty
+      FROM visits v
+      JOIN users p ON v.patient_id = p.id
+      JOIN users d ON v.doctor_id = d.id
+    `;
+    const params = [];
 
-    let visits = Database.getVisits()
-
-    // Filter based on user type
-    if (req.user.userType === "patient") {
-      visits = visits.filter((visit) => visit.patient === req.user.id)
-    } else if (req.user.userType === "doctor") {
-      visits = visits.filter((visit) => visit.doctor === req.user.id)
-    }
-    // Finance can see all visits (no additional filter)
-
-    // Add status filter
-    if (status) {
-      visits = visits.filter((visit) => visit.status === status)
-    }
-
-    // Add date range filter
-    if (startDate || endDate) {
-      visits = visits.filter((visit) => {
-        const visitDate = new Date(visit.appointmentDate)
-        if (startDate && visitDate < new Date(startDate)) return false
-        if (endDate && visitDate > new Date(endDate)) return false
-        return true
-      })
+    if (req.user.role === "patient") {
+      query += " WHERE v.patient_id = $1";
+      params.push(req.user.id);
+    } else if (req.user.role === "doctor") {
+      query += " WHERE v.doctor_id = $1";
+      params.push(req.user.id);
     }
 
-    const populatedVisits = visits.map((visit) => {
-      const patient = Database.findUserById(visit.patient)
-      const doctor = Database.findUserById(visit.doctor)
-      return {
-        ...visit,
-        patient: patient ? { fullName: patient.fullName, email: patient.email, phone: patient.phone } : null,
-        doctor: doctor ? { fullName: doctor.fullName, specialization: doctor.specialization } : null,
-      }
-    })
+    const result = await pool.query(query, params);
+    res.json(result.rows);
 
-    // Apply search filter for finance users
-    if (search && req.user.userType === "finance") {
-      const searchRegex = new RegExp(search, "i")
-      const filteredVisits = populatedVisits.filter(
-        (visit) =>
-          visit.visitId.match(searchRegex) ||
-          (visit.patient && visit.patient.fullName.match(searchRegex)) ||
-          (visit.doctor && visit.doctor.fullName.match(searchRegex)),
-      )
-      return res.json(filteredVisits.sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate)))
-    }
-
-    res.json(populatedVisits.sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate)))
   } catch (error) {
-    console.error("Error fetching visits:", error)
-    res.status(500).json({ message: "Server error" })
+    console.error("Error fetching visits:", error);
+    res.status(500).json({ message: "Server error" });
   }
-})
+});
 
 // Get specific visit
 router.get("/:id", auth, async (req, res) => {
   try {
-    const visit = Database.findVisitById(req.params.id)
+    const visitResult = await pool.query("SELECT * FROM visits WHERE id = $1", [
+      req.params.id,
+    ])
+    const visit = visitResult.rows[0]
+    if (!visit) return res.status(404).json({ message: "Visit not found" })
 
-    if (!visit) {
-      return res.status(404).json({ message: "Visit not found" })
-    }
-
-    // Check authorization
-    if (req.user.userType === "patient" && visit.patient !== req.user.id) {
+    // Authorization
+    if (req.user.role === "patient" && visit.patient_id !== req.user.id)
       return res.status(403).json({ message: "Access denied" })
-    }
-
-    if (req.user.userType === "doctor" && visit.doctor !== req.user.id) {
+    if (req.user.role === "doctor" && visit.doctor_id !== req.user.id)
       return res.status(403).json({ message: "Access denied" })
-    }
 
-    const patient = Database.findUserById(visit.patient)
-    const doctor = Database.findUserById(visit.doctor)
+    const patient = await getUserById(visit.patient_id)
+    const doctor = await getUserById(visit.doctor_id)
 
-    const populatedVisit = {
+    res.json({
       ...visit,
       patient: {
-        fullName: patient.fullName,
+        fullName: patient.name,
         email: patient.email,
         phone: patient.phone,
-        dateOfBirth: patient.dateOfBirth,
+        dateOfBirth: patient.date_of_birth,
       },
-      doctor: { fullName: doctor.fullName, specialization: doctor.specialization },
-    }
-
-    res.json(populatedVisit)
+      doctor: { fullName: doctor.name, specialty: doctor.specialty },
+    })
   } catch (error) {
     console.error("Error fetching visit:", error)
     res.status(500).json({ message: "Server error" })
   }
 })
 
+// Update a visit
+router.put("/:id", auth, async (req, res) => {
+  try {
+    const { symptoms, status, totalAmount, treatments } = req.body;
+
+    // Fetch the visit
+    const visitResult = await pool.query("SELECT * FROM visits WHERE id = $1", [req.params.id]);
+    const visit = visitResult.rows[0];
+    if (!visit) return res.status(404).json({ message: "Visit not found" });
+
+    // Authorization check
+    if (req.user.role === "patient" && visit.patient_id !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+    if (req.user.role === "doctor" && visit.doctor_id !== req.user.id)
+      return res.status(403).json({ message: "Access denied" });
+
+    // Prepare updated fields
+    const updatedSymptoms = req.user.role === "patient" ? symptoms || visit.symptoms : visit.symptoms;
+    const updatedStatus = req.user.role === "doctor" ? status || visit.status : visit.status;
+    const updatedTotalAmount = req.user.role === "doctor" ? totalAmount || visit.total_amount : visit.total_amount;
+    const updatedTreatments = req.user.role === "doctor" ? treatments || visit.treatments : visit.treatments;
+
+    // Update in DB
+    const updateQuery = `
+      UPDATE visits 
+      SET symptoms = $1, status = $2, total_amount = $3, treatments = $4
+      WHERE id = $5
+      RETURNING *
+    `;
+    const updatedVisitResult = await pool.query(updateQuery, [
+      updatedSymptoms,
+      updatedStatus,
+      updatedTotalAmount,
+      JSON.stringify(updatedTreatments), // store JSON as string
+      req.params.id,
+    ]);
+
+    const updatedVisit = updatedVisitResult.rows[0];
+
+    res.json(updatedVisit);
+  } catch (error) {
+    console.error("Error updating visit:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
 // Start visit (Doctor only)
 router.put("/:id/start", auth, authorize("doctor"), async (req, res) => {
   try {
-    const visit = Database.findVisitById(req.params.id)
+    const visitResult = await pool.query("SELECT * FROM visits WHERE id = $1", [
+      req.params.id,
+    ])
+    const visit = visitResult.rows[0]
+    if (!visit) return res.status(404).json({ message: "Visit not found" })
 
-    if (!visit) {
-      return res.status(404).json({ message: "Visit not found" })
-    }
+    if (visit.doctor_id !== req.user.id) return res.status(403).json({ message: "Access denied" })
+    if (visit.status !== "scheduled")
+      return res.status(400).json({ message: `Visit cannot be started. Current status: ${visit.status}` })
 
-    if (visit.doctor !== req.user.id) {
-      return res.status(403).json({ message: "Access denied" })
-    }
+    await pool.query("UPDATE visits SET status = 'in-progress' WHERE id = $1", [req.params.id])
 
-    if (visit.status !== "scheduled") {
-      return res.status(400).json({
-        message: "Visit cannot be started. Current status: " + visit.status,
-      })
-    }
+    const patient = await getUserById(visit.patient_id)
+    const doctor = await getUserById(visit.doctor_id)
 
-    visit.status = "in-progress"
-    Database.updateVisit(visit.id, visit)
-
-    const patient = Database.findUserById(visit.patient)
-    const doctor = Database.findUserById(visit.doctor)
-
-    const populatedVisit = {
+    res.json({
       ...visit,
-      patient: { fullName: patient.fullName, email: patient.email, phone: patient.phone },
-      doctor: { fullName: doctor.fullName, specialization: doctor.specialization },
-    }
-
-    res.json(populatedVisit)
+      status: "in-progress",
+      patient: { fullName: patient.name, email: patient.email, phone: patient.phone },
+      doctor: { fullName: doctor.name, specialty: doctor.specialty },
+    })
   } catch (error) {
     console.error("Error starting visit:", error)
     res.status(500).json({ message: "Server error" })
   }
 })
 
-// Update visit with medical information (Doctor only)
-router.put("/:id/medical", auth, authorize("doctor"), async (req, res) => {
-  try {
-    const { diagnosis, treatments, notes } = req.body
+// Update medical info (Doctor only)
+router.put(
+  "/:id/medical",
+  auth,
+  authorize("doctor"),
+  [
+    body("diagnosis").optional().isString(),
+    body("treatments").optional().isArray(),
+    body("notes").optional().isString(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() })
 
-    const visit = Database.findVisitById(req.params.id)
+      const { diagnosis, treatments, notes } = req.body
+      const visitResult = await pool.query("SELECT * FROM visits WHERE id = $1", [req.params.id])
+      const visit = visitResult.rows[0]
+      if (!visit) return res.status(404).json({ message: "Visit not found" })
+      if (visit.doctor_id !== req.user.id) return res.status(403).json({ message: "Access denied" })
 
-    if (!visit) {
-      return res.status(404).json({ message: "Visit not found" })
+      await pool.query(
+        `UPDATE visits SET diagnosis = $1, treatments = $2, notes = $3 WHERE id = $4`,
+        [diagnosis || visit.diagnosis, treatments || visit.treatments, notes || visit.notes, req.params.id]
+      )
+
+      const patient = await getUserById(visit.patient_id)
+      const doctor = await getUserById(visit.doctor_id)
+
+      res.json({
+        ...visit,
+        diagnosis: diagnosis || visit.diagnosis,
+        treatments: treatments || visit.treatments,
+        notes: notes || visit.notes,
+        patient: { fullName: patient.name, email: patient.email, phone: patient.phone },
+        doctor: { fullName: doctor.name, specialty: doctor.specialty },
+      })
+    } catch (error) {
+      console.error("Error updating visit:", error)
+      res.status(500).json({ message: "Server error" })
     }
-
-    if (visit.doctor !== req.user.id) {
-      return res.status(403).json({ message: "Access denied" })
-    }
-
-    // Update medical information
-    if (diagnosis) visit.diagnosis = diagnosis
-    if (treatments) visit.treatments = treatments
-    if (notes) visit.notes = notes
-
-    Database.updateVisit(visit.id, visit)
-
-    const patient = Database.findUserById(visit.patient)
-    const doctor = Database.findUserById(visit.doctor)
-
-    const populatedVisit = {
-      ...visit,
-      patient: { fullName: patient.fullName, email: patient.email, phone: patient.phone },
-      doctor: { fullName: doctor.fullName, specialization: doctor.specialization },
-    }
-
-    res.json(populatedVisit)
-  } catch (error) {
-    console.error("Error updating visit:", error)
-    res.status(500).json({ message: "Server error" })
   }
-})
+)
 
 // Complete visit (Doctor only)
 router.put("/:id/complete", auth, authorize("doctor"), async (req, res) => {
   try {
-    const visit = Database.findVisitById(req.params.id)
+    const visitResult = await pool.query("SELECT * FROM visits WHERE id = $1", [req.params.id])
+    const visit = visitResult.rows[0]
+    if (!visit) return res.status(404).json({ message: "Visit not found" })
+    if (visit.doctor_id !== req.user.id) return res.status(403).json({ message: "Access denied" })
+    if (visit.status !== "in-progress")
+      return res.status(400).json({ message: `Visit cannot be completed. Current status: ${visit.status}` })
 
-    if (!visit) {
-      return res.status(404).json({ message: "Visit not found" })
-    }
+    await pool.query("UPDATE visits SET status = 'completed' WHERE id = $1", [req.params.id])
 
-    if (visit.doctor !== req.user.id) {
-      return res.status(403).json({ message: "Access denied" })
-    }
+    const patient = await getUserById(visit.patient_id)
+    const doctor = await getUserById(visit.doctor_id)
 
-    if (visit.status !== "in-progress") {
-      return res.status(400).json({
-        message: "Visit cannot be completed. Current status: " + visit.status,
-      })
-    }
-
-    visit.status = "completed"
-    Database.updateVisit(visit.id, visit)
-
-    const patient = Database.findUserById(visit.patient)
-    const doctor = Database.findUserById(visit.doctor)
-
-    const populatedVisit = {
+    res.json({
       ...visit,
-      patient: { fullName: patient.fullName, email: patient.email, phone: patient.phone },
-      doctor: { fullName: doctor.fullName, specialization: doctor.specialization },
-    }
-
-    res.json(populatedVisit)
+      status: "completed",
+      patient: { fullName: patient.name, email: patient.email, phone: patient.phone },
+      doctor: { fullName: doctor.name, specialty: doctor.specialty },
+    })
   } catch (error) {
     console.error("Error completing visit:", error)
     res.status(500).json({ message: "Server error" })
@@ -299,25 +275,21 @@ router.put("/:id/complete", auth, authorize("doctor"), async (req, res) => {
 router.put("/:id/payment", auth, authorize("finance"), async (req, res) => {
   try {
     const { isPaid } = req.body
+    const visitResult = await pool.query("SELECT * FROM visits WHERE id = $1", [req.params.id])
+    const visit = visitResult.rows[0]
+    if (!visit) return res.status(404).json({ message: "Visit not found" })
 
-    const visit = Database.findVisitById(req.params.id)
-    if (!visit) {
-      return res.status(404).json({ message: "Visit not found" })
-    }
+    await pool.query("UPDATE visits SET is_paid = $1 WHERE id = $2", [isPaid, req.params.id])
 
-    visit.isPaid = isPaid
-    Database.updateVisit(visit.id, visit)
+    const patient = await getUserById(visit.patient_id)
+    const doctor = await getUserById(visit.doctor_id)
 
-    const patient = Database.findUserById(visit.patient)
-    const doctor = Database.findUserById(visit.doctor)
-
-    const populatedVisit = {
+    res.json({
       ...visit,
-      patient: { fullName: patient.fullName, email: patient.email, phone: patient.phone },
-      doctor: { fullName: doctor.fullName, specialization: doctor.specialization },
-    }
-
-    res.json(populatedVisit)
+      is_paid: isPaid,
+      patient: { fullName: patient.name, email: patient.email, phone: patient.phone },
+      doctor: { fullName: doctor.name, specialty: doctor.specialty },
+    })
   } catch (error) {
     console.error("Error updating payment:", error)
     res.status(500).json({ message: "Server error" })
@@ -325,3 +297,6 @@ router.put("/:id/payment", auth, authorize("finance"), async (req, res) => {
 })
 
 module.exports = router
+
+
+

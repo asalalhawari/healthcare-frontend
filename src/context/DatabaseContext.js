@@ -19,29 +19,29 @@ export const DatabaseProvider = ({ children }) => {
   const [loading, setLoading] = useState(false)
   const { user } = useAuth()
 
-  // استخدام useCallback لتحسين دوال التحديث
-  const refreshVisits = useCallback(async () => {
-    if (!user) return
+// Use useCallback to optimize update function
+const refreshVisits = useCallback(async () => {
+  if (!user) return;
 
-    try {
-      setLoading(true)
-      const response = await fetch("http://localhost:3002/api/visits", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      })
+  try {
+    setLoading(true);
+    const response = await fetch("http://localhost:3002/api/visits", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-      if (response.ok) {
-        const visitsData = await response.json()
-        setVisits(visitsData)
-      }
-    } catch (error) {
-      console.error("Failed to fetch visits:", error)
-    } finally {
-      setLoading(false)
+    if (response.ok) {
+      const visitsData = await response.json();
+      setVisits(visitsData);
     }
-  }, [user]) // التبعيات: `refreshVisits` تعتمد على `user`
+  } catch (error) {
+    console.error("Failed to fetch visits:", error);
+  } finally {
+    setLoading(false);
+  }
+}, [user]); // Dependencies: refreshVisits depends on `user`
 
   const refreshDoctors = useCallback(async () => {
     if (!user) return
@@ -129,25 +129,25 @@ export const DatabaseProvider = ({ children }) => {
   }
 
   const setDoctorAvailability = async (doctorId, isAvailable) => {
-    try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL || "http://localhost:3000/api"}/users/${doctorId}/availability`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ isAvailable }),
-        },
-      )
+    // try {
+    //   const response = await fetch(
+    //     `${process.env.REACT_APP_API_URL || "http://localhost:3000/api"}/users/${doctorId}/availability`,
+    //     {
+    //       method: "PUT",
+    //       headers: {
+    //         Authorization: `Bearer ${localStorage.getItem("token")}`,
+    //         "Content-Type": "application/json",
+    //       },
+    //       body: JSON.stringify({ isAvailable }),
+    //     },
+    //   )
 
-      if (response.ok) {
-        await refreshDoctors()
-      }
-    } catch (error) {
-      console.error("Failed to update availability:", error)
-    }
+    //   if (response.ok) {
+    //     await refreshDoctors()
+    //   }
+    // } catch (error) {
+    //   console.error("Failed to update availability:", error)
+    // }
   }
 
   const searchVisits = (query) => {

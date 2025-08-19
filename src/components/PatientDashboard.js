@@ -6,42 +6,70 @@ import { useDatabase } from "../context/DatabaseContext"
 
 const PatientDashboard = () => {
   const { user, logout } = useAuth()
-  const { visits, doctors, addVisit } = useDatabase()
+  const { visits, doctors, addVisit,refreshVisits } = useDatabase()
   const [selectedDoctor, setSelectedDoctor] = useState("")
   const [visitDate, setVisitDate] = useState("")
+  const [symptoms, setSymptoms] = useState("");
   const [showBooking, setShowBooking] = useState(false)
 
-  const patientVisits = visits.filter((visit) => visit.patientId === user?.id)
+  const patientVisits = visits
+  console.log(patientVisits);
   const availableDoctors = doctors;
   
+const handleBookVisit = async (e) => {
+  e.preventDefault()
+  if (!selectedDoctor || !visitDate || !user) return
 
-  const handleBookVisit = (e) => {
-    e.preventDefault()
-    if (!selectedDoctor || !visitDate || !user) return
-
-    const doctor = doctors.find((d) => d.id === selectedDoctor)
-    if (!doctor) return
-
-    addVisit({
-      patientId: user.id,
-      patientName: user.name,
-      doctorId: doctor.id,
-      doctorName: doctor.name,
-      date: visitDate,
-      status: "scheduled",
-      treatments: [],
-      notes: "",
+  try {
+    const response = await fetch("http://localhost:3002/api/visits", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        doctorId: selectedDoctor,
+        date: visitDate,
+        symptoms: symptoms,
+      }),
     })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Booking failed:", errorData)
+      alert("❌ Failed to book visit")
+      return
+    }
+
+    const newVisit = await response.json()
+    alert("✅ Visit booked successfully!")
+    // Optionally update local visits state
+    // addVisit(newVisit)
 
     setSelectedDoctor("")
     setVisitDate("")
+    setSymptoms("")
     setShowBooking(false)
-    alert("✅ Visit booked successfully!")
+    refreshVisits()
+  } catch (error) {
+    console.error("Booking error:", error)
+    alert("❌ Failed to book visit")
   }
+}
+
 
   const scheduledVisits = patientVisits.filter((v) => v.status === "scheduled")
   const completedVisits = patientVisits.filter((v) => v.status === "completed")
-  const totalSpent = completedVisits.reduce((sum, visit) => sum + visit.totalAmount, 0)
+  const totalSpent = Math.floor(
+  completedVisits.reduce((sum, visit) => {
+    // calculate treatment total if treatments exist
+    const treatmentsTotal = visit.treatments
+      ? visit.treatments.reduce((tSum, t) => tSum + (t.cost || 0), 0)
+      : 0;
+
+    return sum + (visit.totalAmount || 0) + treatmentsTotal;
+  }, 0)
+);
 
   return (
     <div className="dashboard">
@@ -75,6 +103,7 @@ const PatientDashboard = () => {
           </div>
         </div>
 
+        
         <div className="actions">
           <button onClick={() => setShowBooking(!showBooking)} className="primary-btn">
             {showBooking ? "Cancel Booking" : "📅 Book New Visit"}
@@ -107,6 +136,17 @@ const PatientDashboard = () => {
                   required
                 />
               </div>
+
+              <div className="form-group">
+                <label htmlFor="date">Symptoms</label>
+                <input
+                  type="text"
+                  id="symptoms"
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                  required
+                />
+              </div>
               <div className="form-actions">
                 <button type="submit" className="primary-btn">
                   📅 Book Visit
@@ -119,6 +159,9 @@ const PatientDashboard = () => {
           </div>
         )}
 
+
+        
+
         <div className="visits-section">
           <h3>My Medical Visits</h3>
           {patientVisits.length === 0 ? (
@@ -128,11 +171,11 @@ const PatientDashboard = () => {
           ) : (
             <div className="visits-list">
               {patientVisits
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .sort((a, b) => new Date(b.appointment_date) - new Date(a.appointment_date))
                 .map((visit) => (
                   <div key={visit.id} className={`visit-card ${visit.status}`}>
                     <div className="visit-header">
-                      <h4>👨‍⚕️ Dr. {visit.doctorName}</h4>
+                      <h4>👨‍⚕️ Dr. {visit.doctor_name}</h4>
                       <span className={`status ${visit.status}`}>
                         {visit.status === "scheduled" && "⏰ "}
                         {visit.status === "in-progress" && "🔄 "}
@@ -141,24 +184,13 @@ const PatientDashboard = () => {
                       </span>
                     </div>
                     <p>
-                      <strong>📅 Date:</strong> {new Date(visit.date).toLocaleString()}
+                      <strong>📅 Date:</strong> {new Date(visit.appointment_date).toLocaleString()}
                     </p>
                     <p>
-                      <strong>💰 Total Amount:</strong> ${visit.totalAmount.toFixed(2)}
+                      <strong>💰 Total Amount:</strong> ${visit.total_amount}
                     </p>
-                    {visit.treatments.length > 0 && (
-                      <div className="treatments">
-                        <strong>💊 Treatments:</strong>
-                        <ul>
-                          {visit.treatments.map((treatment) => (
-                            <li key={treatment.id}>
-                              • {treatment.name} - ${treatment.cost.toFixed(2)}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {visit.notes && (
+    
+                    {visit.symptoms && (
                       <div
                         style={{
                           marginTop: "1rem",
@@ -167,15 +199,16 @@ const PatientDashboard = () => {
                           borderRadius: "var(--radius-md)",
                         }}
                       >
-                        <strong>📝 Doctor's Notes:</strong>
-                        <p style={{ marginTop: "0.5rem", fontStyle: "italic" }}>{visit.notes}</p>
+                        <strong>📝 Symptoms:</strong>
+                        <p style={{ marginTop: "0.5rem", fontStyle: "italic" }}>{visit.symptoms}</p>
                       </div>
-                    )}
+                    )} 
                   </div>
                 ))}
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

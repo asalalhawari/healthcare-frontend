@@ -1,80 +1,22 @@
-const mongoose = require("mongoose")
+const visitId = "V" + Date.now() + Math.random().toString(36).substr(2, 5).toUpperCase();
 
-const treatmentSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-    required: true,
-  },
-  cost: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-})
+const result = await pool.query(
+  `INSERT INTO visits
+   (visit_id, patient_id, doctor_id, appointment_date, status, symptoms, diagnosis, treatments, total_amount, notes, is_paid)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+  [
+    visitId,
+    req.user.id,
+    doctorId,
+    new Date(date),
+    "scheduled",
+    symptoms,
+    "",
+    JSON.stringify([]),
+    0,
+    "",
+    false,
+  ]
+);
 
-const visitSchema = new mongoose.Schema(
-  {
-    visitId: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    patient: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    doctor: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    appointmentDate: {
-      type: Date,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ["scheduled", "in-progress", "completed", "cancelled"],
-      default: "scheduled",
-    },
-    symptoms: {
-      type: String,
-      required: true,
-    },
-    diagnosis: {
-      type: String,
-      default: "",
-    },
-    treatments: [treatmentSchema],
-    totalAmount: {
-      type: Number,
-      default: 0,
-    },
-    notes: {
-      type: String,
-      default: "",
-    },
-    isPaid: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  {
-    timestamps: true,
-  },
-)
-
-// Calculate total amount before saving
-visitSchema.pre("save", function (next) {
-  this.totalAmount = this.treatments.reduce((total, treatment) => {
-    return total + treatment.cost
-  }, 0)
-  next()
-})
-
-module.exports = mongoose.model("Visit", visitSchema)
+const visit = result.rows[0];

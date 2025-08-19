@@ -14,9 +14,17 @@ const FinanceDashboard = () => {
   })
   const [filteredVisits, setFilteredVisits] = useState(visits)
 
+  // ✅ Completed visits
   const completedVisits = visits.filter((visit) => visit.status === "completed")
-  const totalRevenue = completedVisits.reduce((sum, visit) => sum + visit.totalAmount, 0)
-  const averageVisitCost = completedVisits.length > 0 ? totalRevenue / completedVisits.length : 0
+
+  // ✅ Calculate total revenue (visit.total_amount + treatments cost)
+  const totalRevenue = completedVisits.reduce((sum, visit) => {
+    const treatmentCost = visit.treatments?.reduce((s, t) => s + (t.cost || 0), 0) || 0
+    return Math.floor(sum) + Math.floor(visit.total_amount || 0) + Math.floor(treatmentCost)
+  }, 0)
+
+  // ✅ Average cost
+  const averageVisitCost = completedVisits.length > 0 ? Math.round(totalRevenue / completedVisits.length) : 0
 
   const handleSearch = () => {
     const results = searchVisits(searchQuery)
@@ -37,7 +45,7 @@ const FinanceDashboard = () => {
       <header className="dashboard-header">
         <h1>Finance Dashboard</h1>
         <div className="user-info">
-          <span>Welcome, {user?.name}</span>
+          <span>Welcome, {user?.username}</span>
           <button onClick={logout} className="logout-btn">
             Logout
           </button>
@@ -56,14 +64,15 @@ const FinanceDashboard = () => {
           </div>
           <div className="stat-card">
             <h3>Total Revenue</h3>
-            <p className="stat-number">${totalRevenue.toFixed(2)}</p>
+            <p className="stat-number">${totalRevenue}</p>
           </div>
           <div className="stat-card">
             <h3>Average Visit Cost</h3>
-            <p className="stat-number">${averageVisitCost.toFixed(2)}</p>
+            <p className="stat-number">${averageVisitCost}</p>
           </div>
         </div>
 
+        {/* Search Section */}
         <div className="search-section">
           <h3>Search Visits</h3>
           <div className="search-form">
@@ -110,6 +119,7 @@ const FinanceDashboard = () => {
           </div>
         </div>
 
+        {/* Visits Table */}
         <div className="visits-section">
           <h3>Visit Records ({filteredVisits.length} found)</h3>
           {filteredVisits.length === 0 ? (
@@ -130,49 +140,55 @@ const FinanceDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredVisits.map((visit) => (
-                    <tr key={visit.id}>
-                      <td>{visit.id}</td>
-                      <td>{visit.patientName}</td>
-                      <td>{visit.doctorName}</td>
-                      <td>{new Date(visit.date).toLocaleDateString()}</td>
-                      <td>
-                        <span className={`status ${visit.status}`}>{visit.status}</span>
-                      </td>
-                      <td>{visit.treatments.length}</td>
-                      <td>${visit.totalAmount.toFixed(2)}</td>
-                      <td>
-                        <button
-                          className="view-btn"
-                          onClick={() => {
-                            const details = `
+                  {filteredVisits.map((visit) => {
+                    const treatmentCost = visit.treatments?.reduce((s, t) => s + (t.cost || 0), 0) || 0
+                    const totalAmount = Math.floor(visit.total_amount || 0) + Math.floor(treatmentCost)
+
+                    return (
+                      <tr key={visit.id}>
+                        <td>{visit.id}</td>
+                        <td>{visit.patient_name}</td>
+                        <td>{visit.doctor_name}</td>
+                        <td>{new Date(visit.appointment_date).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`status ${visit.status}`}>{visit.status}</span>
+                        </td>
+                        <td>{visit.treatments?.length || 0}</td>
+                        <td>${totalAmount}</td>
+                        <td>
+                          <button
+                            className="view-btn"
+                            onClick={() => {
+                              const details = `
 Visit Details:
 - ID: ${visit.id}
-- Patient: ${visit.patientName}
-- Doctor: ${visit.doctorName}
-- Date: ${new Date(visit.date).toLocaleString()}
+- Patient: ${visit.patient_name}
+- Doctor: ${visit.doctor_name}
+- Date: ${new Date(visit.appointment_date).toLocaleString()}
 - Status: ${visit.status}
 - Notes: ${visit.notes || "No notes"}
 
 Treatments:
-${visit.treatments.map((t) => `- ${t.name}: $${t.cost}`).join("\n")}
+${visit.treatments?.map((t) => `- ${t.name}: $${t.cost}`).join("\n") || "No treatments"}
 
-Total Amount: $${visit.totalAmount}
-                            `
-                            alert(details)
-                          }}
-                        >
-                          View Details
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+Total Amount: $${totalAmount}
+                              `
+                              alert(details)
+                            }}
+                          >
+                            View Details
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
 
+        {/* Revenue Analysis */}
         <div className="revenue-analysis">
           <h3>Revenue Analysis</h3>
           <div className="analysis-grid">
@@ -187,15 +203,17 @@ Total Amount: $${visit.totalAmount}
             <div className="analysis-card">
               <h4>Revenue Breakdown</h4>
               <ul>
-                <li>Completed Revenue: ${totalRevenue.toFixed(2)}</li>
+                <li>Completed Revenue: ${totalRevenue}</li>
                 <li>
                   Pending Revenue: $
                   {visits
                     .filter((v) => v.status !== "completed")
-                    .reduce((sum, v) => sum + v.totalAmount, 0)
-                    .toFixed(2)}
+                    .reduce((sum, v) => {
+                      const treatmentCost = v.treatments?.reduce((s, t) => s + (t.cost || 0), 0) || 0
+                      return sum + (v.total_amount || 0) + treatmentCost
+                    }, 0)}
                 </li>
-                <li>Average per Visit: ${averageVisitCost.toFixed(2)}</li>
+                <li>Average per Visit: ${averageVisitCost}</li>
               </ul>
             </div>
           </div>
