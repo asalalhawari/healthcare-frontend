@@ -849,3 +849,111 @@ button[type="submit"]:active {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-500);
 }
+/* ===== ADD DOCTOR PAGE ===== */
+.add-doctor-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--gray-200);
+}
+
+.add-doctor-container h2 {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 2rem;
+  color: var(--gray-800);
+}
+
+.add-doctor-form .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.add-doctor-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.add-doctor-form input,
+.add-doctor-form select,
+.add-doctor-form textarea {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background-color: var(--white);
+  font-family: inherit;
+}
+
+.add-doctor-form input:focus,
+.add-doctor-form select:focus,
+.add-doctor-form textarea:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px var(--primary-blue-light);
+  transform: translateY(-1px);
+}
+
+.add-doctor-form input:hover,
+.add-doctor-form select:hover,
+.add-doctor-form textarea:hover {
+  border-color: var(--gray-300);
+}
+
+/* Buttons */
+.add-doctor-form .submit-btn {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+  color: var(--white);
+  padding: 0.875rem 1.5rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.add-doctor-form .submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.add-doctor-form .cancel-btn {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  padding: 0.875rem 1.5rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--gray-300);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.add-doctor-form .cancel-btn:hover {
+  background: var(--gray-200);
+  transform: translateY(-1px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .add-doctor-container {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+
+  .add-doctor-form .submit-btn,
+  .add-doctor-form .cancel-btn {
+    width: 100%;
+  }
+}

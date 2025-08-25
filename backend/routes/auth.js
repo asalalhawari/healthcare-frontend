@@ -2,7 +2,7 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const bcrypt = require("bcryptjs");
-const pool = require("../data/db.js"); // PostgreSQL connection
+const pool = require("../data/db.js"); 
 const router = express.Router();
 
 // Generate JWT token

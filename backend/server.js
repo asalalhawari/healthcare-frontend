@@ -3,7 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const app = express();
-const PORT = process.env.PORT || 3002; // استخدم نفس الـ PORT في .env
+const PORT = process.env.PORT || 3002; 
 
 // Middleware
 app.use(cors());
@@ -14,6 +14,9 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/visits", require("./routes/visits"));
 app.use("/api/doctors", require("./routes/doctors"));
+
+const doctorRoutes = require("./routes/doctorRoutes");
+app.use("/api/doctors", doctorRoutes);
 
 // Health check endpoint
 app.get("/api/health", async (req, res) => {

@@ -5,6 +5,7 @@ import Login from "./components/Login";
 import PatientDashboard from "./components/PatientDashboard";
 import DoctorDashboard from "./components/DoctorDashboard";
 import FinanceDashboard from "./components/FinanceDashboard";
+import AddDoctor from "./components/AddDoctor";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { DatabaseProvider } from "./context/DatabaseContext";
 import "./App.css";
@@ -22,11 +23,7 @@ function PrivateRoute({ children }) {
 function AppRoutes() {
   const { user, loading } = useAuth();
 
-  if (loading) return <div>Loading...</div>; // wait until user is loaded
-
-
-  
-  
+  if (loading) return <div>Loading...</div>;
 
   return (
     <Routes>
@@ -35,10 +32,6 @@ function AppRoutes() {
         path="/login"
         element={user ? <Navigate to="/" replace /> : <Login />}
       />
-
-
-      
-
 
       {/* Protected routes */}
       {user?.role == null && (
@@ -61,7 +54,6 @@ function AppRoutes() {
           }
         />
       )}
-
       {user?.role === "doctor" && (
         <Route
           path="/"
@@ -72,19 +64,27 @@ function AppRoutes() {
           }
         />
       )}
-
       {user?.role === "finance" && (
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <FinanceDashboard />
-            </PrivateRoute>
-          }
-        />
+        <>
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <FinanceDashboard />
+              </PrivateRoute>
+            }
+          />
+          {/* Route جديد لصفحة AddDoctor */}
+          <Route
+            path="/add-doctor"
+            element={
+              <PrivateRoute>
+                <AddDoctor />
+              </PrivateRoute>
+            }
+          />
+        </>
       )}
-
-      
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />

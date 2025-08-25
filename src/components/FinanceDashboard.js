@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
 import { useDatabase } from "../context/DatabaseContext"
+import { useNavigate } from "react-router-dom"
 
 const FinanceDashboard = () => {
   const { user, logout } = useAuth()
   const { visits, searchVisits } = useDatabase()
+  const navigate = useNavigate() // ✅ إضافة useNavigate
+
   const [searchQuery, setSearchQuery] = useState({
     doctorName: "",
     patientName: "",
@@ -40,6 +43,11 @@ const FinanceDashboard = () => {
     setFilteredVisits(visits)
   }, [visits])
 
+  // ✅ دالة التوجيه لصفحة إضافة دكتور
+  const goToAddDoctor = () => {
+    navigate("/add-doctor")
+  }
+
   return (
     <div className="dashboard">
       <header className="dashboard-header">
@@ -70,6 +78,23 @@ const FinanceDashboard = () => {
             <h3>Average Visit Cost</h3>
             <p className="stat-number">${averageVisitCost}</p>
           </div>
+        </div>
+
+        {/* ✅ زر إضافة دكتور */}
+        <div style={{ margin: "20px 0" }}>
+          <button
+            onClick={goToAddDoctor}
+            style={{
+              padding: "10px 20px",
+              backgroundColor: "pink",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            Add Doctor
+          </button>
         </div>
 
         {/* Search Section */}
